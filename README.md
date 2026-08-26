@@ -59,10 +59,11 @@ const kvCache = {
 **An account with no orders answers HTTP 400**, not an empty list. `getOrders` maps that one
 message to an empty page; any other 400 still throws.
 
-**`getOrder` returns `null` on 404** rather than throwing, because "this account cannot see
-that order" is an ordinary answer — an order placed on a sister company's account, or one
-predating the API, reaches you as `null`. A 500 still throws: not-found and upstream-broken are
-different facts.
+**`getOrder` returns `null` for a missing order** rather than throwing, because "this account
+cannot see that order" is an ordinary answer — an order placed on a sister company's account, or
+one predating the API, reaches you as `null`. Upstream signals that with `400 {"message":"Order
+not found."}` rather than a 404, so both are read as not-found. A 500, or a 400 saying anything
+else, still throws: not-found and upstream-broken are different facts.
 
 ## API
 

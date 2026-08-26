@@ -102,13 +102,20 @@ export class VoipClient {
    * GET /api/orders/{id} — 5/min upstream, the tightest limit on the API. Accepts a web order
    * number (`829431`) or an ERP one (`SO0345172`).
    *
-   * ⚠️ Returns `null` on 404 rather than throwing, and a `null` is NOT cached.
+   * ⚠️ Returns `null` when the order is not there, and a `null` is NOT cached.
    *
    * "This vendor does not return that order" is an answer a caller renders, not an exception it
    * handles — an order placed on a different account, or predating the API, is the ordinary
    * case rather than the error case. Caching the null would then hide a newly-visible order for
    * a minute, which is the one direction that costs someone a wasted lookup. Any other status,
    * a 500 included, still throws: not-found and upstream-broken are different facts.
+   *
+   * ⚠️ **Not-found arrives as HTTP 400, not 404.** Measured on staging 2026-08-26: asking for
+   * order 99999999 answered `400 {"message":"Order not found.","response":"failed"}`. That is
+   * the same shape `getOrders` already had to handle for an empty account, so this endpoint is
+   * not an exception — 400-plus-a-message is simply how this API says "nothing here". 404 is
+   * still treated as not-found too, because a gateway or a future version may well send one and
+   * both mean the same thing to a caller. A 400 saying anything else still throws.
    */
   async getOrder(orderId: string): Promise<Order | null> {
     const key = cacheKey(`orders/${orderId}`);
@@ -121,7 +128,7 @@ export class VoipClient {
       }
       return data.order;
     } catch (e) {
-      if (e instanceof VoipApiError && e.status === 404) return null;
+      if (e instanceof VoipApiError && isOrderNotFound(e)) return null;
       throw e;
     }
   }
@@ -133,4 +140,15 @@ export class VoipClient {
       return data.warehouses;
     });
   }
+}
+
+/**
+ * Is this error upstream saying "no such order", as opposed to upstream being broken?
+ *
+ * Measured on staging 2026-08-26: a missing order answers `400 {"message":"Order not found."}`,
+ * not 404. 404 counts too — a proxy in front of the API, or a later version of it, may send one,
+ * and to a caller the two carry identical information.
+ */
+function isOrderNotFound(e: VoipApiError): boolean {
+  return e.status === 404 || (e.status === 400 && e.body.includes('Order not found'));
 }

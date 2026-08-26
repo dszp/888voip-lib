@@ -48,6 +48,16 @@ describe('getOrder', () => {
     await expect(client().getOrder('999')).resolves.toBeNull();
   });
 
+  it('returns null on the 400 "Order not found." that staging actually sends', async () => {
+    stubFetch({ '/api/orders/99999999': { status: 400, body: { message: 'Order not found.', response: 'failed' } } });
+    await expect(client().getOrder('99999999')).resolves.toBeNull();
+  });
+
+  it('still throws on a 400 that is not the not-found case', async () => {
+    stubFetch({ '/api/orders/1': { status: 400, body: { message: 'Bad request' } } });
+    await expect(client().getOrder('1')).rejects.toMatchObject({ status: 400 });
+  });
+
   it('still throws on a 500, which is not the same fact as "no such order"', async () => {
     stubFetch({ '/api/orders/1': { status: 500, body: 'boom' } });
     await expect(client().getOrder('1')).rejects.toMatchObject({ status: 500 });
@@ -70,7 +80,7 @@ describe('caching', () => {
   });
 
   it('does not cache a null, so a newly-visible order is not hidden for a minute', async () => {
-    const spy = stubFetch({ '/api/orders/999': { status: 404, body: 'nope' } });
+    const spy = stubFetch({ '/api/orders/999': { status: 400, body: { message: 'Order not found.' } } });
     const c = client(memoryCache());
     await c.getOrder('999');
     await c.getOrder('999');

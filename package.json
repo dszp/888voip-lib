@@ -4,10 +4,21 @@
   "description": "Portable, Node-free 888VoIP Channel Advantage toolkit: a read-only API client, an injected cache interface, and the normalisations their API's quirks require. Runs unchanged in a Cloudflare Worker, Node, or the browser.",
   "type": "module",
   "license": "MIT",
-  "author": { "name": "David Szpunar", "url": "https://david.szpunar.com" },
+  "author": {
+    "name": "David Szpunar",
+    "url": "https://david.szpunar.com"
+  },
   "private": true,
-  "engines": { "node": ">=20" },
-  "keywords": ["888voip", "distributor", "voip", "inventory", "cloudflare-workers"],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "888voip",
+    "distributor",
+    "voip",
+    "inventory",
+    "cloudflare-workers"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,13 +32,21 @@
   "module": "./dist/index.js",
   "main": "./dist/index.js",
   "sideEffects": false,
-  "files": ["dist/**/*.js", "dist/**/*.d.ts", "README.md"],
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "devDependencies": { "typescript": "^5", "vitest": "^3" },
+  "devDependencies": {
+    "tsx": "^4.23.12",
+    "typescript": "^5",
+    "vitest": "^3"
+  },
   "packageManager": "pnpm@11.11.0"
 }
