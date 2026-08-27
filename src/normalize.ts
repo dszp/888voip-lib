@@ -21,11 +21,15 @@ const NAMED_ENTITIES: Record<string, string> = {
 };
 
 export function decodeHtmlEntities(input: string): string {
-  return input.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, body: string) => {
+  return input.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, body: string) => {
     if (body[0] === "#") {
       const isHex = body[1] === "x" || body[1] === "X";
       const code = parseInt(isHex ? body.slice(2) : body.slice(1), isHex ? 16 : 10);
-      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+      // Out of range, or a lone surrogate, and `String.fromCodePoint` throws or emits an
+      // unpaired half. Leaving the reference as written costs one odd-looking product name;
+      // throwing would fail the whole getProducts call over one of them.
+      if (Number.isNaN(code) || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return match;
+      return String.fromCodePoint(code);
     }
     return NAMED_ENTITIES[body.toLowerCase()] ?? match;
   });
@@ -65,15 +69,19 @@ export function htmlToMarkdown(html: string): string {
   }
 
   s = s.replace(/<(ul|ol)[^>]*>([\s\S]*?)<\/\1>/gi, (_m, tag: string, inner: string) => {
+    // Filter on the ITEM, before it is numbered. Testing the rendered line for "has a character
+    // that is not a digit, dot or dash" dropped `<li>802.11</li>` — a spec figure is a real
+    // bullet — and advancing `n` inside the map made an ordered list skip a number whenever one
+    // was dropped. An EMPTY <li> is the only one worth removing.
+    const lines: string[] = [];
     let n = 0;
-    const lines = [...inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
-      .map((m) => {
-        // `?? ""` only to satisfy noUncheckedIndexedAccess, which this repo sets and the
-        // MCP server this was lifted from did not: group 1 always participates in a match.
-        const text = inlineToMarkdown(m[1] ?? "");
-        return tag.toLowerCase() === "ol" ? `${++n}. ${text}` : `- ${text}`;
-      })
-      .filter((line) => /[^\s\d.\-]/.test(line));
+    for (const m of inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)) {
+      // `?? ""` only to satisfy noUncheckedIndexedAccess, which this repo sets and the
+      // MCP server this was lifted from did not: group 1 always participates in a match.
+      const text = inlineToMarkdown(m[1] ?? "");
+      if (text === "") continue;
+      lines.push(tag.toLowerCase() === "ol" ? `${++n}. ${text}` : `- ${text}`);
+    }
     return `\n\n${lines.join("\n")}\n\n`;
   });
 
@@ -142,7 +150,10 @@ export function normalizeProduct(p: Product, withMarkdown = false): Product {
  * "no PO" from "a PO that is a space".
  */
 export function poRefOf(order: Pick<Order, 'poNumber' | 'poOrderNumber'>): string | null {
-  const raw = order.poNumber ?? order.poOrderNumber ?? '';
-  const trimmed = raw.trim();
-  return trimmed === '' ? null : trimmed;
+  // First NON-BLANK, not first non-nullish. `??` skips only null and undefined, and this API
+  // sends present-but-empty strings freely (a pre-shipment billing address is all of them), so
+  // `{ poNumber: '', poOrderNumber: 'ACME-PO-1' }` would have answered null and lost a real PO.
+  return [order.poNumber, order.poOrderNumber]
+    .map((v) => (v ?? '').trim())
+    .find((v) => v !== '') ?? null;
 }

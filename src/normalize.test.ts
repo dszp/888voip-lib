@@ -78,3 +78,42 @@ describe('poRefOf', () => {
     expect(poRefOf({ poOrderNumber: '   ' })).toBeNull();
   });
 });
+
+describe('poRefOf, on the shapes this API actually sends', () => {
+  it('reads poOrderNumber when poNumber is present but empty', () => {
+    // The API sends present-but-empty strings elsewhere (billing arrives all-empty before
+    // shipment), so an empty poNumber beside a real poOrderNumber is an expected shape, and
+    // `??` would have let the empty one win.
+    expect(poRefOf({ poNumber: '', poOrderNumber: 'ACME-PO-1' })).toBe('ACME-PO-1');
+  });
+
+  it('reads poOrderNumber when poNumber is only whitespace', () => {
+    expect(poRefOf({ poNumber: '   ', poOrderNumber: 'ACME-PO-1' })).toBe('ACME-PO-1');
+  });
+});
+
+describe('decodeHtmlEntities, on references that are not well-formed', () => {
+  it('decodes an uppercase hex reference, which is legal HTML', () => {
+    expect(decodeHtmlEntities('v2 &#X2013; final')).toBe('v2 – final');
+  });
+
+  it('leaves an out-of-range code point alone instead of throwing', () => {
+    // String.fromCodePoint throws above 0x10FFFF, and one bad product name must not fail the
+    // whole getProducts call.
+    expect(decodeHtmlEntities('a &#99999999999; b')).toBe('a &#99999999999; b');
+  });
+
+  it('leaves a lone surrogate alone rather than emitting an unpaired one', () => {
+    expect(decodeHtmlEntities('a &#xD800; b')).toBe('a &#xD800; b');
+  });
+});
+
+describe('htmlToMarkdown, on list items that are only digits', () => {
+  it('keeps a numeric bullet such as a spec figure', () => {
+    expect(htmlToMarkdown('<ul><li>802.11</li><li>2.4</li></ul>')).toBe('- 802.11\n- 2.4');
+  });
+
+  it('still drops an empty list item', () => {
+    expect(htmlToMarkdown('<ul><li>a</li><li></li></ul>')).toBe('- a');
+  });
+});
