@@ -12,7 +12,12 @@ export { VoipClient } from './readClient';
 export type { VoipClientOptions, OrdersOptions, ProductListOptions, ProductOptions } from './readClient';
 export { VoipApiError, VoipShapeError } from './http';
 export { createToken, revokeToken, revokeAllTokens } from './auth';
-export { cacheKey, getOrFetch, memoryCache, readThrough, TTL } from './cache';
+// Only `memoryCache` and the `VoipCache` type. `cacheKey`, `readThrough`, `getOrFetch` and `TTL`
+// exist to serve caching that lives INSIDE the client, and nothing outside needs them — the MCP
+// server that used them before the client owned its cache no longer does. Exporting them at 0.1.0
+// would fix a key format and a read-through signature as public API forever. Adding an export
+// later is a minor bump; removing one is a major.
+export { memoryCache } from './cache';
 export type { VoipCache } from './cache';
 export { decodeHtmlEntities, htmlToMarkdown, normalizeCategories, normalizeProduct, poRefOf } from './normalize';
 export type {

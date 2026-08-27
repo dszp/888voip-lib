@@ -5,15 +5,23 @@ import * as lib from './index';
 describe('public surface', () => {
   it('exports exactly what consumers are meant to reach', () => {
     expect(Object.keys(lib).sort()).toEqual([
-      'TTL', 'VoipApiError', 'VoipClient', 'VoipShapeError',
-      'cacheKey', 'createToken', 'decodeHtmlEntities', 'getOrFetch',
+      'VoipApiError', 'VoipClient', 'VoipShapeError',
+      'createToken', 'decodeHtmlEntities',
       'htmlToMarkdown', 'memoryCache', 'normalizeCategories', 'normalizeProduct',
-      'poRefOf', 'readThrough', 'revokeAllTokens', 'revokeToken',
+      'poRefOf', 'revokeAllTokens', 'revokeToken',
     ]);
   });
 
   it('does not export the transport, which is an implementation detail', () => {
     expect(lib).not.toHaveProperty('request');
+  });
+
+  it('does not export the caching internals the client owns', () => {
+    // A key format and a read-through signature are not API. The client caches; a consumer
+    // supplies the store and, if it cares, observes through onCacheRead.
+    for (const name of ['cacheKey', 'readThrough', 'getOrFetch', 'TTL']) {
+      expect(lib).not.toHaveProperty(name);
+    }
   });
 
   it('does not export the testkit, which carries vitest', () => {
