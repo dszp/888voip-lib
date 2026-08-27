@@ -164,3 +164,43 @@ describe('an unexpected 200', () => {
     await expect(client().getProducts()).rejects.toThrow(/unexpected shape.*"products"/);
   });
 });
+
+describe('getProduct', () => {
+  it('encodes a sku that contains URL punctuation', async () => {
+    const spy = stubFetch({ '/api/products/ACME%2FPHONE%201': { body: { product: {
+      sku: 'ACME/PHONE 1', name: 'Acme', price: 1, qty: 1, stockByWarehouse: {},
+    } } } });
+    await client().getProduct('ACME/PHONE 1');
+    expect(String(spy.mock.calls[0]![0])).toBe(`${BASE}/api/products/ACME%2FPHONE%201`);
+  });
+
+  it('asks for private stock only when told to', async () => {
+    const spy = stubFetch({ '/api/products/ACME-1?privateStock=1': { body: { product: {
+      sku: 'ACME-1', name: 'Acme', price: 0, qty: 0, stockByWarehouse: {},
+    } } } });
+    await client().getProduct('ACME-1', true);
+    expect(String(spy.mock.calls[0]![0])).toContain('privateStock=1');
+  });
+
+  it('derives the markdown description without being asked, and leaves the HTML alone', async () => {
+    stubFetch({ '/api/products/ACME-1': { body: { product: {
+      sku: 'ACME-1', name: 'Acme', price: 1, qty: 1, stockByWarehouse: {},
+      description: '<p>Ships with a <strong>5V/2A</strong> supply.</p>',
+    } } } });
+    const p = await client().getProduct('ACME-1');
+    expect(p.descriptionMarkdown).toBe('Ships with a **5V/2A** supply.');
+    expect(p.description).toBe('<p>Ships with a <strong>5V/2A</strong> supply.</p>');
+  });
+});
+
+describe('the remaining list endpoints', () => {
+  it('returns categories verbatim, because they are the filter keys', async () => {
+    stubFetch({ '/api/categories': { body: { categories: ['Adapters & Connectors', 'Wi-Fi & DECT'] } } });
+    await expect(client().getCategories()).resolves.toEqual(['Adapters & Connectors', 'Wi-Fi & DECT']);
+  });
+
+  it('unwraps private warehouses from their own envelope key', async () => {
+    stubFetch({ '/api/private-warehouses': { body: { warehouses: [{ warehouse: 'BUF', description: 'Buffalo' }] } } });
+    await expect(client().getPrivateWarehouses()).resolves.toEqual([{ warehouse: 'BUF', description: 'Buffalo' }]);
+  });
+});

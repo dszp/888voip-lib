@@ -27,8 +27,22 @@ async function send(baseUrl: string, path: string, init: RequestInit): Promise<u
   // ⚠️ The request BODY is never included in the error. On create-token that body is the
   // account password, and an error message is the single most likely thing to be logged,
   // pasted into a ticket, or shown on a page.
+  //
+  // ⚠️ The RESPONSE body is included, up to 500 bytes, by VoipApiError — which is upstream's
+  // text, not ours. If 888VoIP ever echoes submitted fields in a validation error, the password
+  // rides in on that. Out of our control; worth knowing before pasting one of these anywhere.
   if (!resp.ok) throw new VoipApiError(resp.status, await resp.text(), url.pathname);
-  return resp.json();
+  // A revoke answering 204, or 200 with nothing in it, is the ordinary DELETE shape — parsing
+  // it unconditionally made a SUCCESSFUL revocation report failure. And a non-JSON 200 (a
+  // gateway's HTML, say) is named rather than surfaced as a bare SyntaxError. Neither message
+  // carries the body: see above.
+  const text = await resp.text();
+  if (text.trim() === '') return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`888VoIP ${path} answered 200 with a body that is not JSON`);
+  }
 }
 
 /** POST /api/create-token — unauthenticated. Returns a bearer token that never expires. */
@@ -36,10 +50,10 @@ export async function createToken(baseUrl: string, email: string, password: stri
   const data = await send(baseUrl, 'create-token', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
-  }) as { token?: unknown };
+  }) as { token?: unknown } | null;
   // A 200 with no token is not success. Returning `undefined as string` here would surface as
   // an unexplained 401 on the next call, one layer away from the cause.
-  if (typeof data.token !== 'string' || data.token === '') {
+  if (data === null || typeof data.token !== 'string' || data.token === '') {
     throw new Error('888VoIP create-token returned no token');
   }
   return data.token;

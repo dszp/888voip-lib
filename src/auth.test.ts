@@ -55,3 +55,25 @@ describe('revokeAllTokens', () => {
     expect(String(spy.mock.calls[0]![0])).toBe('https://api.example.com/api/revoke-all-tokens');
   });
 });
+
+describe('a revoke that answers with no body', () => {
+  it('succeeds on a 204, which is the ordinary shape for a DELETE', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));
+    await expect(revokeToken('https://api.example.com', 'tok')).resolves.toBeUndefined();
+  });
+
+  it('succeeds on a 200 with an empty body', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 200 })));
+    await expect(revokeAllTokens('https://api.example.com', 'tok')).resolves.toBeUndefined();
+  });
+
+  it('reports a non-JSON 200 without echoing the body back', async () => {
+    // The body is upstream's, and upstream validation errors have been known to echo submitted
+    // fields — on create-token one of those is the password.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>hunter2</html>', { status: 200 })));
+    await expect(createToken('https://api.example.com', 'a@example.com', 'hunter2'))
+      .rejects.toThrowError(expect.objectContaining({
+        message: expect.not.stringContaining('hunter2'),
+      }));
+  });
+});

@@ -23,6 +23,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
+      "//require": "ESM-only package. This `require` condition lets Node >=22.12 load it via require(esm); older Node still gets an accurate ERR_REQUIRE_ESM here instead of the confusing ERR_PACKAGE_PATH_NOT_EXPORTED the bare export map produced. Same shape as the three sibling libs — change all four or none.",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     },

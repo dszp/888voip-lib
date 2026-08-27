@@ -72,6 +72,9 @@ describe('request', () => {
     const err = await request('https://api.example.com', 'sec-ret-token', 'orders')
       .then(() => null, (e: unknown) => e as Error);
     expect(err).not.toBeNull();
-    expect(JSON.stringify({ n: err!.name, m: err!.message })).not.toContain('sec-ret-token');
+    // The stack is in the assertion, not only in the name of the test: a token that reached
+    // `super()` as part of the message would be reported by the stack frame too.
+    expect(JSON.stringify({ n: err!.name, m: err!.message, s: err!.stack ?? '' }))
+      .not.toContain('sec-ret-token');
   });
 });

@@ -116,7 +116,20 @@ export interface ProvisioningEntry {
 export interface Order {
   orderNumber: number;
   orderStatus: string;
+  /**
+   * ⚠️ NO TIMEZONE. Measured shape: `"2021-08-04T14:40:59"` — no `Z`, no offset, so
+   * `new Date(orderDate)` parses it as LOCAL time and yields a different instant in a Worker
+   * (UTC) than in a browser in Indiana. That is the one place "runs unchanged everywhere"
+   * would have quietly meant "gives a different answer everywhere".
+   *
+   * Use the DATE PART (`orderDate.slice(0, 10)`) and do not convert. Day granularity is what a
+   * purchase date means anyway, and it is the only reading that agrees across runtimes.
+   *
+   * The vendor ships out of Buffalo, so US-Eastern is the obvious guess for the wall clock —
+   * but it is a guess. Nothing in their docs states it and nothing here has measured it.
+   */
   orderDate: string;
+  /** Null until shipment. Same missing-timezone caveat as `orderDate`. */
   orderShippedDate?: string | null;
   shippingTotal: string | number;
   total: string | number;
