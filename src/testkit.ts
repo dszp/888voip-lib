@@ -44,6 +44,11 @@ export function fakeOrder(over: Partial<Order> = {}): Order {
         { serial: 'FAKESERIAL0000001', mac: '020000000001' },
         { serial: 'FAKESERIAL0000002', mac: '020000000002' },
       ],
+    }, {
+      // A non-serialised line, shaped as production sends it: ONE entry for a qty of three,
+      // its serial the SKU repeated, and no mac key at all.
+      lineNumber: 1, sku: 'ACME-PSU-1', qty: 3, price: 9,
+      serialsAndMacs: [{ serial: 'ACME-PSU-1' }],
     }],
     poOrderNumber: 'ACME-PO-1',
     erpOrderNumber: 'SO0000001',

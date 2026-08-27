@@ -61,9 +61,22 @@ export interface Address {
   telephone?: string;
 }
 
+/**
+ * One unit on an order line — or a placeholder standing in for a line that has no units.
+ *
+ * ⚠️ `mac` IS OPTIONAL, and the type used to lie about that. Measured against a live production
+ * order 2026-08-27: a line for a non-serialised item (a power supply, bought seven at a time)
+ * carries a SINGLE entry whose `serial` is the SKU repeated and which has no `mac` key at all.
+ * A consumer that trusted `mac: string` read `undefined` off a field the type promised.
+ *
+ * So `serialsAndMacs.length` is NOT a unit count, and an entry is not necessarily a unit. What
+ * separates the two — a serial equal to the SKU, a missing mac, or the item's own `qty` — is a
+ * judgement the importer makes with its own rules; there is one observation behind the shape
+ * above and that is not enough to make a rule here.
+ */
 export interface SerialAndMac {
   serial: string;
-  mac: string;
+  mac?: string;
 }
 
 export interface OrderItem {

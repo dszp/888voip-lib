@@ -204,3 +204,15 @@ describe('the remaining list endpoints', () => {
     await expect(client().getPrivateWarehouses()).resolves.toEqual([{ warehouse: 'BUF', description: 'Buffalo' }]);
   });
 });
+
+describe('a line with no serialised units', () => {
+  it('carries an entry with no mac at all, which the type must allow', async () => {
+    stubFetch({ '/api/orders/100001': { body: { order: fakeOrder() } } });
+    const order = await client().getOrder('100001');
+    const psu = order?.items.find((i) => i.sku === 'ACME-PSU-1');
+    expect(psu?.serialsAndMacs?.[0]?.mac).toBeUndefined();
+    // And the entry count is not the unit count: one entry stands for a qty of three.
+    expect(psu?.serialsAndMacs).toHaveLength(1);
+    expect(psu?.qty).toBe(3);
+  });
+});

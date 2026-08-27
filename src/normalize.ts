@@ -142,9 +142,14 @@ export function normalizeProduct(p: Product, withMarkdown = false): Product {
  * measured against order 829431 on 2026-08-26, the single-order response also returned
  * `poOrderNumber`. Rather than trust either statement, both are read.
  *
- * `poNumber` wins when both are present and differ, because it is the documented name for the
+ * `poNumber` wins when both are non-blank and differ, because it is the documented name for the
  * more specific response — but that case has never been observed and the tie-break exists so
  * the answer is defined rather than incidental.
+ *
+ * Re-measured against a live production single-order response 2026-08-27: `poNumber` is ABSENT
+ * (no key), and `poOrderNumber` carries the value. So the `??` this used to use was returning
+ * the right answer for real orders — the empty-string case it got wrong is a shape this API is
+ * known to send elsewhere, not one seen on this field yet.
  *
  * Empty and whitespace collapse to null so a consumer storing this never has to distinguish
  * "no PO" from "a PO that is a space".
