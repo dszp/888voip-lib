@@ -110,6 +110,17 @@ export interface AssetTag {
   mac?: string;
 }
 
+/**
+ * Present only on an order placed through 888VoIP's provisioning service, where they stage the
+ * phones before shipping them.
+ *
+ * ⚠️ SECRETS. `srvUser`/`srvPass` are the credentials for YOUR provisioning server, supplied on
+ * `POST /api/orders` and read back in plaintext by anything holding the API token — so that token
+ * is more than catalog access, and anything that stores or renders an order stores these too.
+ * `AssetTag.login`/`pin` are per-extension credentials with the same property.
+ *
+ * Absent — not empty — on an order placed without a provisioning block.
+ */
 export interface ProvisioningEntry {
   sku: string;
   qty: number;

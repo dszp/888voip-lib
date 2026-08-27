@@ -12,10 +12,9 @@ import { VoipClient, memoryCache, poRefOf } from '../src/index';
 const baseUrl = process.env.VOIP888_BASE ?? 'https://stagingapi.888voip.com';
 const token = process.env.VOIP888_TOKEN;
 if (token === undefined || token === '') {
-  // Where the staging token actually lives is recorded in the PRIVATE guidance that this repo's
-  // gitignored CLAUDE.md imports — not here. A vault reference is an internal identifier, and
-  // this repo is written to be published, so the leak guard rejects one on sight.
-  console.error('Set VOIP888_TOKEN (staging bearer token — see the local CLAUDE.md for where it lives).');
+  // Deliberately says WHAT to set and not where yours is kept. A path into a secret manager names
+  // an internal system, which is not something a published repository should carry.
+  console.error('Set VOIP888_TOKEN to a staging bearer token (see createToken in src/auth.ts to mint one).');
   process.exit(1);
 }
 

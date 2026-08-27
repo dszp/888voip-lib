@@ -32,8 +32,12 @@ the host of its `baseUrl`, so running staging beside production over a single KV
 safe. Pass `cacheNamespace` only to separate two accounts on one host, and never pass the token:
 keys get logged, listed and enumerated.
 
-⚠️ A cached order carries live SIP credentials in its provisioning block. Back the cache with
-something private and short-lived.
+⚠️ **If you use 888VoIP's provisioning service, a cached order carries live SIP credentials.**
+An order placed with a `provisioning` block reads back with that block intact — your provisioning
+server's `srvUser`/`srvPass`, and a `login`/`pin` per extension — so anything that caches the order
+is now storing them. Back the cache with something private and short-lived, and do not log what it
+round-trips. Orders placed without a provisioning block carry no credentials, and the field is
+absent rather than empty.
 
 ## Read only
 
@@ -53,7 +57,9 @@ lists **10/min**. Pass a `cache`:
 | No caching | omit it, and mind the limits |
 
 `VoipCache` is two methods over strings — `get(key)` and `put(key, value, ttlSeconds)` — so
-nothing here is bound to any one runtime.
+nothing here is bound to any one runtime. The TTLs and key format are the client's business, not
+yours; pass `onCacheRead` if you want to see whether the cache answered a given call, which under
+limits this tight is the only view you have of your own headroom.
 
 ```ts
 const kvCache = {
@@ -79,8 +85,8 @@ else, still throws: not-found and upstream-broken are different facts.
 |---|---|
 | `VoipClient` | `getProducts`, `getProduct`, `getCategories`, `getOrders`, `getOrder`, `getPrivateWarehouses` |
 | `createToken` / `revokeToken` / `revokeAllTokens` | Credential management. Tokens never expire; revocation is the only rotation. |
-| `memoryCache`, `cacheKey`, `readThrough`, `getOrFetch`, `TTL` | Caching, and the key and TTL choices behind it. `readThrough` also reports whether the cache answered. |
-| `poRefOf` | The PO reference we gave the vendor, from either of the two field names it arrives under |
+| `memoryCache` | An in-process `VoipCache`, for Node scripts and tests. Not for a Worker — module state dies with the isolate. |
+| `poRefOf` | The purchase-order reference you gave the vendor, from either of the two field names it arrives under |
 | `normalizeProduct`, `normalizeCategories`, `decodeHtmlEntities`, `htmlToMarkdown` | The upstream quirks, handled |
 | `VoipApiError` | Carries `status` and `body` |
 | `VoipShapeError` | A 200 that is not the envelope the endpoint documents — upstream answered, just not with something readable |

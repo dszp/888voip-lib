@@ -13,10 +13,14 @@
  * convenience, and requiring it would put a Workers-shaped method back into the contract.
  */
 /**
- * ⚠️ WHAT YOU ARE STORING: a cached order carries its provisioning block, and that block
- * carries live SIP credentials — `ProvisioningEntry.srvPass`, and `AssetTag.login`/`pin`. Point
- * this at something private and short-lived (Workers KV is fine; a shared or world-readable
- * store is not), and do not log the values it round-trips.
+ * ⚠️ WHAT YOU MAY BE STORING: an order placed through 888VoIP's provisioning service reads back
+ * with its `provisioning` block intact, and that block holds live SIP credentials —
+ * `ProvisioningEntry.srvUser`/`srvPass`, and `AssetTag.login`/`pin` per extension. Cache such an
+ * order and you are storing them. Point this at something private and short-lived (Workers KV is
+ * fine; a shared or world-readable store is not), and do not log what it round-trips.
+ *
+ * An order placed WITHOUT a provisioning block has no such field at all, so a caller that does not
+ * use that service is caching nothing sensitive. Know which case you are in rather than assuming.
  */
 export interface VoipCache {
   get(key: string): Promise<string | null>;

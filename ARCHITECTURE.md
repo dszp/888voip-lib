@@ -1,6 +1,6 @@
 # Architecture
 
-Five modules, each with one job, composed in one direction. Nothing imports its consumer.
+Seven files, each with one job, composed in one direction. Nothing imports its consumer.
 
 ```
 model.ts      types only, no behaviour
@@ -38,8 +38,12 @@ read, and because it happens once when a human rotates a secret rather than on e
 
 ## Where the API's real behaviour is documented
 
-`888voip-api/reference/API-NOTES.md`, in the MCP server's repo, compiled from the Postman
-collection and the docs site's compiled JS bundles and then checked against a full staging
-order lifecycle. Where the published docs and a live measurement disagree, the measurement
-wins and the disagreement is recorded in a comment at the code that handles it — see
-`poRefOf` in `normalize.ts` and `getOrders` in `readClient.ts`.
+In this repository, at the code that handles it. The vendor's published documentation and the
+vendor's actual responses disagree in several places — numbers documented as strings, "not
+found" answered with HTTP 400 rather than 404, a `mac` field the docs promise and the API
+omits — so every such case carries a comment saying what was measured and when. Start with
+`poRefOf` in `normalize.ts`, `getOrders` and `getOrder` in `readClient.ts`, and
+`SerialAndMac` in `model.ts`.
+
+Where the two disagree, the measurement wins. A confident sentence in a vendor's docs is not
+evidence about a vendor's server.
