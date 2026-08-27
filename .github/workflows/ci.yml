@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned to a COMMIT, not a tag: a tag is mutable, and a compromised action is a
+      # compromised build. The trailing comment records which release the hash was, so a human can
+      # tell at a glance whether the pin is stale.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No leak-guard here, deliberately. The pattern list IS the denylist -- committing it to a
+      # public repo would publish an index of exactly what we mask, and this log is public too.
+      # That check runs as a local pre-push hook, which is also the right layer: CI runs AFTER the
+      # push, when a leak is already public.
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck (includes the test files the build excludes)
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test

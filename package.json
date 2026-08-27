@@ -1,14 +1,24 @@
 {
   "name": "@dszp/888voip-lib",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Portable, Node-free 888VoIP Channel Advantage toolkit: a read-only API client, an injected cache interface, and the normalisations their API's quirks require. Runs unchanged in a Cloudflare Worker, Node, or the browser.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dszp/888voip-lib.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dszp/888voip-lib/issues"
+  },
+  "homepage": "https://github.com/dszp/888voip-lib#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "author": {
     "name": "David Szpunar",
     "url": "https://david.szpunar.com"
   },
-  "private": true,
   "engines": {
     "node": ">=20"
   },

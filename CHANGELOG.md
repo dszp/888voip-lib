@@ -1,9 +1,11 @@
 # Changelog
 
-## 0.0.1 — unreleased
+## 0.1.0 — 2026-08-27
 
-First cut, lifted out of the read-only 888VoIP MCP server so a Cloudflare Worker can call the
-API without going through an interactively-authenticated MCP connector.
+First public release. Lifted out of the read-only 888VoIP MCP server so a Cloudflare Worker can
+call the API without going through an interactively-authenticated MCP connector — and that server
+then folded onto this library and deleted its own copy, which is the only test of portability that
+counts.
 
 Three things changed in the lift:
 
