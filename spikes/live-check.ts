@@ -18,7 +18,7 @@ if (token === undefined || token === '') {
 
 const client = new VoipClient({ baseUrl, token, cache: memoryCache() });
 
-const page = await client.getOrders(1, true);
+const page = await client.getOrders({ newestFirst: true });
 console.log(`orders: total=${page.total} lastPage=${page.lastPage} returned=${page.orders.length}`);
 for (const o of page.orders.slice(0, 3)) {
   console.log(`  ${o.orderNumber} ${o.orderDate.slice(0, 10)} ${o.orderStatus} po=${poRefOf(o) ?? '—'} erp=${o.erpOrderNumber ?? '—'}`);

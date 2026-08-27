@@ -9,7 +9,7 @@
  * put a devDependency into every consumer's runtime graph.
  */
 export { VoipClient } from './readClient';
-export type { VoipClientOptions } from './readClient';
+export type { VoipClientOptions, OrdersOptions, ProductListOptions, ProductOptions } from './readClient';
 export { VoipApiError, VoipShapeError } from './http';
 export { createToken, revokeToken, revokeAllTokens } from './auth';
 export { cacheKey, getOrFetch, memoryCache, readThrough, TTL } from './cache';

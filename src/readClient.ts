@@ -22,6 +22,29 @@ export interface VoipClientOptions {
 }
 
 /**
+ * Per-call options.
+ *
+ * Objects rather than positional booleans: `getOrders(1, true)` tells a reader nothing at the
+ * call site, and every future option would have to queue up behind the ones already there.
+ */
+export interface ProductListOptions {
+  /** Also derive `descriptionMarkdown` per product. Off by default — it is not free on a list. */
+  withMarkdown?: boolean;
+}
+
+export interface ProductOptions {
+  /** Report YOUR private warehouse stock instead of 888VoIP's. */
+  privateStock?: boolean;
+}
+
+export interface OrdersOptions {
+  /** 1-based; 50 orders per page. The response carries `lastPage`. */
+  page?: number;
+  /** Newest first. The API's own default is OLDEST first, which is rarely what you want. */
+  newestFirst?: boolean;
+}
+
+/**
  * READ-ONLY client for the 888VoIP Channel Advantage API.
  *
  * Every method is a GET. There is deliberately no write surface on this class and no write
@@ -71,7 +94,8 @@ export class VoipClient {
   }
 
   /** GET /api/products — 10/min upstream. `withMarkdown` derives `descriptionMarkdown`. */
-  async getProducts(filters: ProductFilters = {}, withMarkdown = false): Promise<Product[]> {
+  async getProducts(filters: ProductFilters = {}, opts: ProductListOptions = {}): Promise<Product[]> {
+    const withMarkdown = opts.withMarkdown ?? false;
     const key = this.key('products', { ...filters, withMarkdown });
     return getOrFetch(this.cache, key, TTL.productsList, async () => {
       const data = await this.get<unknown>('products', VoipClient.productParams(filters));
@@ -85,7 +109,8 @@ export class VoipClient {
    *
    * Includes `descriptionMarkdown` whenever the product has a description to derive it from.
    */
-  async getProduct(sku: string, privateStock = false): Promise<Product> {
+  async getProduct(sku: string, opts: ProductOptions = {}): Promise<Product> {
+    const privateStock = opts.privateStock ?? false;
     const key = this.key(`products/${sku}`, { privateStock });
     return getOrFetch(this.cache, key, TTL.product, async () => {
       const params = new URLSearchParams();
@@ -112,7 +137,9 @@ export class VoipClient {
    * is mapped to an empty page here — otherwise every consumer would have to know this quirk.
    * A 400 that says anything else still throws.
    */
-  async getOrders(page = 1, newestFirst = false): Promise<OrdersPage> {
+  async getOrders(opts: OrdersOptions = {}): Promise<OrdersPage> {
+    const page = opts.page ?? 1;
+    const newestFirst = opts.newestFirst ?? false;
     const key = this.key('orders', { page, newestFirst });
     return getOrFetch(this.cache, key, TTL.ordersList, async () => {
       const params = new URLSearchParams({ page: String(page) });

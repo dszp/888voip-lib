@@ -22,7 +22,7 @@ describe('getOrders', () => {
 
   it('asks for newest-first only when told to', async () => {
     const spy = stubFetch({ '/api/orders?page=1&orderBy=desc': { body: { total: 0, page: 1, lastPage: 1, orders: [] } } });
-    await client().getOrders(1, true);
+    await client().getOrders({ newestFirst: true });
     expect(String(spy.mock.calls[0]![0])).toContain('orderBy=desc');
   });
 
@@ -178,7 +178,7 @@ describe('getProduct', () => {
     const spy = stubFetch({ '/api/products/ACME-1?privateStock=1': { body: { product: {
       sku: 'ACME-1', name: 'Acme', price: 0, qty: 0, stockByWarehouse: {},
     } } } });
-    await client().getProduct('ACME-1', true);
+    await client().getProduct('ACME-1', { privateStock: true });
     expect(String(spy.mock.calls[0]![0])).toContain('privateStock=1');
   });
 

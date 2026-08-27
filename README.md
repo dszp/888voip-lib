@@ -21,11 +21,19 @@ const client = new VoipClient({
   cache: memoryCache(),
 });
 
-const page = await client.getOrders(1, true);
+const page = await client.getOrders({ newestFirst: true });
 for (const order of page.orders) {
   console.log(order.orderNumber, order.orderStatus, poRefOf(order));
 }
 ```
+
+One cache, two servers, and the keys must say which is which — the client scopes every key to
+the host of its `baseUrl`, so running staging beside production over a single KV namespace is
+safe. Pass `cacheNamespace` only to separate two accounts on one host, and never pass the token:
+keys get logged, listed and enumerated.
+
+⚠️ A cached order carries live SIP credentials in its provisioning block. Back the cache with
+something private and short-lived.
 
 ## Read only
 
@@ -71,10 +79,11 @@ else, still throws: not-found and upstream-broken are different facts.
 |---|---|
 | `VoipClient` | `getProducts`, `getProduct`, `getCategories`, `getOrders`, `getOrder`, `getPrivateWarehouses` |
 | `createToken` / `revokeToken` / `revokeAllTokens` | Credential management. Tokens never expire; revocation is the only rotation. |
-| `memoryCache`, `cacheKey`, `getOrFetch`, `TTL` | Caching, and the key and TTL choices behind it |
+| `memoryCache`, `cacheKey`, `readThrough`, `getOrFetch`, `TTL` | Caching, and the key and TTL choices behind it. `readThrough` also reports whether the cache answered. |
 | `poRefOf` | The PO reference we gave the vendor, from either of the two field names it arrives under |
 | `normalizeProduct`, `normalizeCategories`, `decodeHtmlEntities`, `htmlToMarkdown` | The upstream quirks, handled |
 | `VoipApiError` | Carries `status` and `body` |
+| `VoipShapeError` | A 200 that is not the envelope the endpoint documents — upstream answered, just not with something readable |
 
 ## License
 
