@@ -14,6 +14,33 @@ Three things changed in the lift:
 - **`getOrder` returns `null` for a missing order** instead of throwing. Not-found is an answer
   here, not a failure; 500 still throws.
 
+Reviewed on 2026-08-27, before the MCP server became the first consumer. What that changed:
+
+- **Cache keys are scoped to the API host.** `v1:orders?page=1` said nothing about WHICH 888VoIP
+  answered it, so two clients over one store — staging beside production, which is exactly what
+  sv-dashboard is built to do — served each other's data. `cacheNamespace` separates two accounts
+  on one host. Never the token: keys get logged, listed and enumerated.
+- **A 200 that is not the documented envelope now raises `VoipShapeError`** instead of failing
+  somewhere downstream. `getOrder` used to stringify `undefined` into the cache on such a
+  response, so the failure surfaced on the NEXT call inside `JSON.parse`.
+- **`readThrough` is the caching primitive** and `getOrFetch` the wrapper over it; the client
+  reports each read through the optional `onCacheRead`. Whether the cache answered is the only
+  view a consumer has of its own rate-limit headroom, and it was unrecoverable after the lift.
+- **`poRefOf` picks the first NON-BLANK field**, not the first non-nullish. A present-but-empty
+  `poNumber` used to shadow a populated `poOrderNumber`. Latent rather than active: a live
+  single-order response omits `poNumber` entirely.
+- **`SerialAndMac.mac` is optional**, because a non-serialised line carries one entry whose
+  serial is the SKU repeated and no `mac` at all. `serialsAndMacs.length` is not a unit count.
+- **`Order.orderDate` carries no timezone** — documented, with the safe reading (take the date
+  part, do not convert), because `new Date()` on it means a different instant per runtime.
+- **A revoke answering 204 or an empty 200 is a success**; parsing it unconditionally made a
+  successful revocation throw.
+- `decodeHtmlEntities` no longer throws on an out-of-range numeric reference and now decodes
+  uppercase hex; `htmlToMarkdown` keeps purely numeric list items and no longer mis-numbers an
+  ordered list it trimmed.
+- **Options objects replace positional booleans**: `getOrders({ page, newestFirst })`,
+  `getProduct(sku, { privateStock })`, `getProducts(filters, { withMarkdown })`.
+
 Corrected against staging on 2026-08-26, after the probe in `spikes/live-check.ts`:
 
 - **A missing order answers HTTP 400, not 404.** Order 99999999 returned
