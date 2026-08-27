@@ -1,4 +1,4 @@
-import { getOrFetch, cacheKey, TTL, type VoipCache } from './cache';
+import { readThrough, cacheKey, TTL, type VoipCache } from './cache';
 import { request, VoipApiError, VoipShapeError } from './http';
 import { normalizeProduct } from './normalize';
 import type { Order, OrdersPage, PrivateWarehouse, Product, ProductFilters } from './model';
@@ -19,6 +19,19 @@ export interface VoipClientOptions {
    * credential in all three places.
    */
   cacheNamespace?: string;
+  /**
+   * Optional. Called once per cache-backed read with the key and whether the cache answered it.
+   *
+   * OBSERVABILITY, NOT CONTROL — it cannot change what the client does, and a throw from it is
+   * the caller's problem. It exists because under limits this tight the hit rate is the only
+   * view a consumer has of its own headroom: the MCP server reports it to the model in
+   * `_meta.cached`, and that is the whole reason caching can live here rather than being
+   * re-implemented one layer up just to stay visible.
+   *
+   * Not called when a read never reaches the cache — a not-found order is the case that matters,
+   * because nulls are deliberately not cached.
+   */
+  onCacheRead?: (event: { key: string; cached: boolean }) => void;
 }
 
 /**
@@ -58,6 +71,7 @@ export class VoipClient {
   private readonly token: string;
   private readonly cache: VoipCache | undefined;
   private readonly scope: string;
+  private readonly onCacheRead: VoipClientOptions['onCacheRead'];
 
   constructor(opts: VoipClientOptions) {
     this.baseUrl = opts.baseUrl;
@@ -66,6 +80,14 @@ export class VoipClient {
     // `new URL` throws here rather than on the first request, which is the difference between
     // "your baseUrl is wrong" and a puzzling failure a page later.
     this.scope = opts.cacheNamespace ?? new URL(opts.baseUrl).host;
+    this.onCacheRead = opts.onCacheRead;
+  }
+
+  /** Every cache-backed read goes through here, so the observer cannot be wired to some of them. */
+  private async read<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+    const { value, cached } = await readThrough(this.cache, key, ttlSeconds, fetcher);
+    this.onCacheRead?.({ key, cached });
+    return value;
   }
 
   private get<T>(path: string, params?: URLSearchParams): Promise<T> {
@@ -97,7 +119,7 @@ export class VoipClient {
   async getProducts(filters: ProductFilters = {}, opts: ProductListOptions = {}): Promise<Product[]> {
     const withMarkdown = opts.withMarkdown ?? false;
     const key = this.key('products', { ...filters, withMarkdown });
-    return getOrFetch(this.cache, key, TTL.productsList, async () => {
+    return this.read(key, TTL.productsList, async () => {
       const data = await this.get<unknown>('products', VoipClient.productParams(filters));
       const products = unwrap<Product[]>(data, 'products', '/api/products');
       return products.map((p) => normalizeProduct(p, withMarkdown));
@@ -112,7 +134,7 @@ export class VoipClient {
   async getProduct(sku: string, opts: ProductOptions = {}): Promise<Product> {
     const privateStock = opts.privateStock ?? false;
     const key = this.key(`products/${sku}`, { privateStock });
-    return getOrFetch(this.cache, key, TTL.product, async () => {
+    return this.read(key, TTL.product, async () => {
       const params = new URLSearchParams();
       if (privateStock) params.append('privateStock', '1');
       const path = `products/${encodeURIComponent(sku)}`;
@@ -123,7 +145,7 @@ export class VoipClient {
 
   /** GET /api/categories — 10/min upstream. Values are returned VERBATIM; see normalizeCategories. */
   async getCategories(): Promise<string[]> {
-    return getOrFetch(this.cache, this.key('categories'), TTL.categories, async () => {
+    return this.read(this.key('categories'), TTL.categories, async () => {
       const data = await this.get<unknown>('categories');
       return unwrap<string[]>(data, 'categories', '/api/categories');
     });
@@ -141,7 +163,7 @@ export class VoipClient {
     const page = opts.page ?? 1;
     const newestFirst = opts.newestFirst ?? false;
     const key = this.key('orders', { page, newestFirst });
-    return getOrFetch(this.cache, key, TTL.ordersList, async () => {
+    return this.read(key, TTL.ordersList, async () => {
       const params = new URLSearchParams({ page: String(page) });
       if (newestFirst) params.append('orderBy', 'desc');
       try {
@@ -177,7 +199,10 @@ export class VoipClient {
   async getOrder(orderId: string): Promise<Order | null> {
     const key = this.key(`orders/${orderId}`);
     const cached = this.cache === undefined ? null : await this.cache.get(key);
-    if (cached !== null) return JSON.parse(cached) as Order;
+    if (cached !== null) {
+      this.onCacheRead?.({ key, cached: true });
+      return JSON.parse(cached) as Order;
+    }
     try {
       const path = `orders/${encodeURIComponent(orderId)}`;
       const data = await this.get<unknown>(path);
@@ -188,6 +213,7 @@ export class VoipClient {
       if (this.cache !== undefined) {
         await this.cache.put(key, JSON.stringify(order), Math.max(60, TTL.order));
       }
+      this.onCacheRead?.({ key, cached: false });
       return order;
     } catch (e) {
       if (e instanceof VoipApiError && isOrderNotFound(e)) return null;
@@ -197,7 +223,7 @@ export class VoipClient {
 
   /** GET /api/private-warehouses — 25/min upstream. */
   async getPrivateWarehouses(): Promise<PrivateWarehouse[]> {
-    return getOrFetch(this.cache, this.key('private-warehouses'), TTL.privateWarehouses, async () => {
+    return this.read(this.key('private-warehouses'), TTL.privateWarehouses, async () => {
       const data = await this.get<unknown>('private-warehouses');
       return unwrap<PrivateWarehouse[]>(data, 'warehouses', '/api/private-warehouses');
     });

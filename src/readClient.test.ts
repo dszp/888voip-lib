@@ -216,3 +216,41 @@ describe('a line with no serialised units', () => {
     expect(psu?.qty).toBe(3);
   });
 });
+
+describe('onCacheRead', () => {
+  it('reports a miss then a hit for the same read', async () => {
+    stubFetch({ '/api/orders/100001': { body: { order: fakeOrder() } } });
+    const seen: Array<{ key: string; cached: boolean }> = [];
+    const c = new VoipClient({
+      baseUrl: BASE, token: 'tok', cache: memoryCache(),
+      onCacheRead: (e) => { seen.push(e); },
+    });
+    await c.getOrder('100001');
+    await c.getOrder('100001');
+    expect(seen.map((e) => e.cached)).toEqual([false, true]);
+    expect(seen[0]?.key).toBe('v1:api.example.com/orders/100001');
+  });
+
+  it('reports a miss for every other endpoint too', async () => {
+    stubFetch({ '/api/categories': { body: { categories: ['A'] } } });
+    const seen: boolean[] = [];
+    const c = new VoipClient({
+      baseUrl: BASE, token: 'tok', cache: memoryCache(),
+      onCacheRead: (e) => { seen.push(e.cached); },
+    });
+    await c.getCategories();
+    await c.getCategories();
+    expect(seen).toEqual([false, true]);
+  });
+
+  it('does not fire for a not-found order, which is never a cache read', async () => {
+    stubFetch({ '/api/orders/999': { status: 400, body: { message: 'Order not found.' } } });
+    const seen: boolean[] = [];
+    const c = new VoipClient({
+      baseUrl: BASE, token: 'tok', cache: memoryCache(),
+      onCacheRead: (e) => { seen.push(e.cached); },
+    });
+    expect(await c.getOrder('999')).toBeNull();
+    expect(seen).toEqual([]);
+  });
+});
