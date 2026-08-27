@@ -12,6 +12,12 @@
  * Strings rather than parsed values on purpose: KV's typed `get(key, 'json')` is a Workers
  * convenience, and requiring it would put a Workers-shaped method back into the contract.
  */
+/**
+ * ⚠️ WHAT YOU ARE STORING: a cached order carries its provisioning block, and that block
+ * carries live SIP credentials — `ProvisioningEntry.srvPass`, and `AssetTag.login`/`pin`. Point
+ * this at something private and short-lived (Workers KV is fine; a shared or world-readable
+ * store is not), and do not log the values it round-trips.
+ */
 export interface VoipCache {
   get(key: string): Promise<string | null>;
   put(key: string, value: string, ttlSeconds: number): Promise<void>;
@@ -42,25 +48,41 @@ export function memoryCache(now: () => number = () => Date.now()): VoipCache {
 }
 
 /**
- * Read through a cache, or call the fetcher when there is none.
+ * Read through a cache, or call the fetcher when there is none, SAYING WHICH IT DID.
+ *
+ * Whether a value was served from cache is not bookkeeping — under limits this tight it is the
+ * only way a consumer can see its own rate-limit headroom. The MCP server surfaces it to the
+ * model in `_meta.cached`; a dashboard can use it to decide whether a refresh is worth a call.
+ * So the primitive reports it and `getOrFetch` is the wrapper that throws it away, rather than
+ * the fact being unrecoverable from outside.
  *
  * ⚠️ A rejected fetch writes nothing. Caching a failure would turn a one-second upstream blip
  * into a minute of them, and the caller cannot tell the difference from the outside.
  */
+export async function readThrough<T>(
+  cache: VoipCache | undefined,
+  key: string,
+  ttlSeconds: number,
+  fetcher: () => Promise<T>,
+): Promise<{ value: T; cached: boolean }> {
+  if (cache === undefined) return { value: await fetcher(), cached: false };
+  const hit = await cache.get(key);
+  if (hit !== null) return { value: JSON.parse(hit) as T, cached: true };
+  const value = await fetcher();
+  // KV's own minimum is 60s; clamping here means a caller cannot request a TTL that KV would
+  // silently raise, so what this asks for and what the store does agree in every backend.
+  await cache.put(key, JSON.stringify(value), Math.max(60, ttlSeconds));
+  return { value, cached: false };
+}
+
+/** `readThrough` for callers that only want the value. */
 export async function getOrFetch<T>(
   cache: VoipCache | undefined,
   key: string,
   ttlSeconds: number,
   fetcher: () => Promise<T>,
 ): Promise<T> {
-  if (cache === undefined) return fetcher();
-  const hit = await cache.get(key);
-  if (hit !== null) return JSON.parse(hit) as T;
-  const value = await fetcher();
-  // KV's own minimum is 60s; clamping here means a caller cannot request a TTL that KV would
-  // silently raise, so what this asks for and what the store does agree in every backend.
-  await cache.put(key, JSON.stringify(value), Math.max(60, ttlSeconds));
-  return value;
+  return (await readThrough(cache, key, ttlSeconds, fetcher)).value;
 }
 
 /** A stable key from a path and its params. Sorted, so argument order cannot fragment a cache. */

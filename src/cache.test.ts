@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { cacheKey, getOrFetch, memoryCache, TTL } from './cache';
+import { cacheKey, getOrFetch, memoryCache, readThrough, TTL } from './cache';
 
 describe('cacheKey', () => {
   it('is stable regardless of the order params were supplied in', () => {
@@ -58,5 +58,28 @@ describe('TTL', () => {
   it('caches a single order at least as long as its 5/min limit implies', () => {
     expect(TTL.order).toBeGreaterThanOrEqual(60);
     expect(TTL.ordersList).toBeGreaterThanOrEqual(60);
+  });
+});
+
+describe('readThrough', () => {
+  it('reports whether the value came from the cache', async () => {
+    const cache = memoryCache();
+    const fetcher = async () => ({ n: 1 });
+    expect(await readThrough(cache, 'k', 60, fetcher)).toEqual({ value: { n: 1 }, cached: false });
+    expect(await readThrough(cache, 'k', 60, fetcher)).toEqual({ value: { n: 1 }, cached: true });
+  });
+
+  it('reports not-cached when there is no cache at all', async () => {
+    expect(await readThrough(undefined, 'k', 60, async () => 1)).toEqual({ value: 1, cached: false });
+  });
+
+  it('raises a TTL below the KV floor rather than letting the store raise it silently', async () => {
+    const puts: Array<[string, string, number]> = [];
+    const cache = {
+      get: async () => null,
+      put: async (k: string, v: string, ttl: number) => { puts.push([k, v, ttl]); },
+    };
+    await readThrough(cache, 'k', 5, async () => 1);
+    expect(puts[0]?.[2]).toBe(60);
   });
 });

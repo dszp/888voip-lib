@@ -107,3 +107,60 @@ describe('getProducts', () => {
     expect(url).toContain('privateStock=1');
   });
 });
+
+describe('cache identity', () => {
+  it('does not let two servers sharing one cache serve each other\'s orders', async () => {
+    // sv-dashboard runs staging and production side by side. Keyed on the path alone, the
+    // second client would have answered from the first one's entry.
+    const shared = memoryCache();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const host = new URL(String(input)).host;
+      return new Response(JSON.stringify({
+        order: fakeOrder({ erpOrderNumber: host === 'api.example.com' ? 'SO-LIVE' : 'SO-STAGING' }),
+      }), { status: 200 });
+    }));
+    const live = new VoipClient({ baseUrl: BASE, token: 'tok', cache: shared });
+    const staging = new VoipClient({ baseUrl: 'https://staging.example.com', token: 'tok2', cache: shared });
+    expect((await live.getOrder('100001'))?.erpOrderNumber).toBe('SO-LIVE');
+    expect((await staging.getOrder('100001'))?.erpOrderNumber).toBe('SO-STAGING');
+  });
+
+  it('separates two accounts on one host when given a namespace', async () => {
+    const shared = memoryCache();
+    let n = 0;
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ order: fakeOrder({ erpOrderNumber: `SO-${++n}` }) }), { status: 200 }));
+    vi.stubGlobal('fetch', spy);
+    const a = new VoipClient({ baseUrl: BASE, token: 'tok', cache: shared, cacheNamespace: 'acct-a' });
+    const b = new VoipClient({ baseUrl: BASE, token: 'tok', cache: shared, cacheNamespace: 'acct-b' });
+    await a.getOrder('100001');
+    await b.getOrder('100001');
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('an unexpected 200', () => {
+  it('names the missing envelope key instead of failing somewhere downstream', async () => {
+    stubFetch({ '/api/orders/100001': { body: { response: 'success' } } });
+    await expect(client().getOrder('100001')).rejects.toThrow(/unexpected shape.*"order"/);
+  });
+
+  it('leaves nothing in the cache to poison the next call', async () => {
+    // The old code stringified `undefined` and handed the literal `undefined` to cache.put,
+    // which then blew up one call later, a step removed from the cause.
+    const cache = memoryCache();
+    stubFetch({ '/api/orders/100001': { body: { response: 'success' } } });
+    await expect(client(cache).getOrder('100001')).rejects.toThrow(/unexpected shape/);
+    expect(await cache.get('v1:api.example.com/orders/100001')).toBeNull();
+  });
+
+  it('catches a dot-segment order id, which the URL normalises into the list endpoint', async () => {
+    stubFetch({ '/api/orders/': { body: { total: 0, page: 1, lastPage: 1, orders: [] } } });
+    await expect(client().getOrder('.')).rejects.toThrow(/unexpected shape/);
+  });
+
+  it('names the missing key on a product list too', async () => {
+    stubFetch({ '/api/products': { body: { response: 'success' } } });
+    await expect(client().getProducts()).rejects.toThrow(/unexpected shape.*"products"/);
+  });
+});

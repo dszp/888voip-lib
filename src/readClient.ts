@@ -1,5 +1,5 @@
 import { getOrFetch, cacheKey, TTL, type VoipCache } from './cache';
-import { request, VoipApiError } from './http';
+import { request, VoipApiError, VoipShapeError } from './http';
 import { normalizeProduct } from './normalize';
 import type { Order, OrdersPage, PrivateWarehouse, Product, ProductFilters } from './model';
 
@@ -10,6 +10,15 @@ export interface VoipClientOptions {
   token: string;
   /** Optional. Strongly recommended — the per-minute limits are tight. See `cache.ts`. */
   cache?: VoipCache;
+  /**
+   * Optional. What separates this client's cache entries from another's in a SHARED store.
+   * Defaults to the host of `baseUrl`, which is what keeps staging and production apart when
+   * both run against one KV namespace. Set it only to separate two accounts on ONE host.
+   *
+   * ⚠️ Never the token. Cache keys get logged, listed and enumerated; a credential in one is a
+   * credential in all three places.
+   */
+  cacheNamespace?: string;
 }
 
 /**
@@ -25,15 +34,30 @@ export class VoipClient {
   private readonly baseUrl: string;
   private readonly token: string;
   private readonly cache: VoipCache | undefined;
+  private readonly scope: string;
 
   constructor(opts: VoipClientOptions) {
     this.baseUrl = opts.baseUrl;
     this.token = opts.token;
     this.cache = opts.cache;
+    // `new URL` throws here rather than on the first request, which is the difference between
+    // "your baseUrl is wrong" and a puzzling failure a page later.
+    this.scope = opts.cacheNamespace ?? new URL(opts.baseUrl).host;
   }
 
   private get<T>(path: string, params?: URLSearchParams): Promise<T> {
     return request<T>(this.baseUrl, this.token, path, params);
+  }
+
+  /**
+   * A cache key scoped to the server this client talks to.
+   *
+   * ⚠️ The path alone is NOT a key. sv-dashboard runs staging and production side by side, and
+   * an unscoped `v1:orders?page=1` means whichever client asked first answers for both — the
+   * kind of wrong that looks like working software.
+   */
+  private key(path: string, params: Record<string, unknown> = {}): string {
+    return cacheKey(`${this.scope}/${path}`, params);
   }
 
   private static productParams(filters: ProductFilters = {}): URLSearchParams {
@@ -48,29 +72,35 @@ export class VoipClient {
 
   /** GET /api/products — 10/min upstream. `withMarkdown` derives `descriptionMarkdown`. */
   async getProducts(filters: ProductFilters = {}, withMarkdown = false): Promise<Product[]> {
-    const key = cacheKey('products', { ...filters, withMarkdown });
+    const key = this.key('products', { ...filters, withMarkdown });
     return getOrFetch(this.cache, key, TTL.productsList, async () => {
-      const data = await this.get<{ products: Product[] }>('products', VoipClient.productParams(filters));
-      return data.products.map((p) => normalizeProduct(p, withMarkdown));
+      const data = await this.get<unknown>('products', VoipClient.productParams(filters));
+      const products = unwrap<Product[]>(data, 'products', '/api/products');
+      return products.map((p) => normalizeProduct(p, withMarkdown));
     });
   }
 
-  /** GET /api/products/{sku} — 60/min upstream. Always includes the markdown description. */
+  /**
+   * GET /api/products/{sku} — 60/min upstream.
+   *
+   * Includes `descriptionMarkdown` whenever the product has a description to derive it from.
+   */
   async getProduct(sku: string, privateStock = false): Promise<Product> {
-    const key = cacheKey(`products/${sku}`, { privateStock });
+    const key = this.key(`products/${sku}`, { privateStock });
     return getOrFetch(this.cache, key, TTL.product, async () => {
       const params = new URLSearchParams();
       if (privateStock) params.append('privateStock', '1');
-      const data = await this.get<{ product: Product }>(`products/${encodeURIComponent(sku)}`, params);
-      return normalizeProduct(data.product, true);
+      const path = `products/${encodeURIComponent(sku)}`;
+      const data = await this.get<unknown>(path, params);
+      return normalizeProduct(unwrap<Product>(data, 'product', `/api/${path}`), true);
     });
   }
 
   /** GET /api/categories — 10/min upstream. Values are returned VERBATIM; see normalizeCategories. */
   async getCategories(): Promise<string[]> {
-    return getOrFetch(this.cache, cacheKey('categories'), TTL.categories, async () => {
-      const data = await this.get<{ categories: string[] }>('categories');
-      return data.categories;
+    return getOrFetch(this.cache, this.key('categories'), TTL.categories, async () => {
+      const data = await this.get<unknown>('categories');
+      return unwrap<string[]>(data, 'categories', '/api/categories');
     });
   }
 
@@ -83,7 +113,7 @@ export class VoipClient {
    * A 400 that says anything else still throws.
    */
   async getOrders(page = 1, newestFirst = false): Promise<OrdersPage> {
-    const key = cacheKey('orders', { page, newestFirst });
+    const key = this.key('orders', { page, newestFirst });
     return getOrFetch(this.cache, key, TTL.ordersList, async () => {
       const params = new URLSearchParams({ page: String(page) });
       if (newestFirst) params.append('orderBy', 'desc');
@@ -118,15 +148,20 @@ export class VoipClient {
    * both mean the same thing to a caller. A 400 saying anything else still throws.
    */
   async getOrder(orderId: string): Promise<Order | null> {
-    const key = cacheKey(`orders/${orderId}`);
+    const key = this.key(`orders/${orderId}`);
     const cached = this.cache === undefined ? null : await this.cache.get(key);
     if (cached !== null) return JSON.parse(cached) as Order;
     try {
-      const data = await this.get<{ order: Order }>(`orders/${encodeURIComponent(orderId)}`);
+      const path = `orders/${encodeURIComponent(orderId)}`;
+      const data = await this.get<unknown>(path);
+      // Unwrap BEFORE the cache write. The old order stringified whatever `data.order` was, so
+      // a shapeless 200 put the literal `undefined` into the store and the next call died on
+      // JSON.parse instead — a step removed from the thing that was actually wrong.
+      const order = unwrap<Order>(data, 'order', `/api/${path}`);
       if (this.cache !== undefined) {
-        await this.cache.put(key, JSON.stringify(data.order), Math.max(60, TTL.order));
+        await this.cache.put(key, JSON.stringify(order), Math.max(60, TTL.order));
       }
-      return data.order;
+      return order;
     } catch (e) {
       if (e instanceof VoipApiError && isOrderNotFound(e)) return null;
       throw e;
@@ -135,11 +170,26 @@ export class VoipClient {
 
   /** GET /api/private-warehouses — 25/min upstream. */
   async getPrivateWarehouses(): Promise<PrivateWarehouse[]> {
-    return getOrFetch(this.cache, cacheKey('private-warehouses'), TTL.privateWarehouses, async () => {
-      const data = await this.get<{ warehouses: PrivateWarehouse[] }>('private-warehouses');
-      return data.warehouses;
+    return getOrFetch(this.cache, this.key('private-warehouses'), TTL.privateWarehouses, async () => {
+      const data = await this.get<unknown>('private-warehouses');
+      return unwrap<PrivateWarehouse[]>(data, 'warehouses', '/api/private-warehouses');
     });
   }
+}
+
+/**
+ * Read a documented key off a 200 response, or say plainly that it was not there.
+ *
+ * Cheap insurance against three things that all look alike from the outside: a gateway
+ * answering HTML with a 200, upstream changing an envelope, and an order id that the URL
+ * normalises away — `getOrder('.')` resolves to `/api/orders/`, which is the LIST endpoint and
+ * answers 200 with no `order` at all.
+ */
+function unwrap<T>(data: unknown, key: string, pathAndQuery: string): T {
+  if (typeof data !== 'object' || data === null || (data as Record<string, unknown>)[key] === undefined) {
+    throw new VoipShapeError(pathAndQuery, key);
+  }
+  return (data as Record<string, unknown>)[key] as T;
 }
 
 /**

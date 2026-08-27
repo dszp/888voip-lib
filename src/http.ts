@@ -30,6 +30,24 @@ export class VoipApiError extends Error {
   }
 }
 
+/**
+ * A 200 whose body is not the envelope this endpoint documents.
+ *
+ * Separate from `VoipApiError` because it is a different fact: upstream answered, and answered
+ * successfully, with something this client cannot read. Without it the symptom surfaced far
+ * from the cause — `data.products.map` threw a bare TypeError, and `getOrder` stringified an
+ * `undefined` into the cache, so the *next* call failed on a JSON.parse instead.
+ */
+export class VoipShapeError extends Error {
+  constructor(
+    public readonly pathAndQuery: string,
+    public readonly missingKey: string,
+  ) {
+    super(`888VoIP returned an unexpected shape from ${pathAndQuery}: no "${missingKey}" in the response body.`);
+    this.name = 'VoipShapeError';
+  }
+}
+
 export async function request<T>(
   baseUrl: string,
   token: string,

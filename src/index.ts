@@ -10,9 +10,9 @@
  */
 export { VoipClient } from './readClient';
 export type { VoipClientOptions } from './readClient';
-export { VoipApiError } from './http';
+export { VoipApiError, VoipShapeError } from './http';
 export { createToken, revokeToken, revokeAllTokens } from './auth';
-export { cacheKey, getOrFetch, memoryCache, TTL } from './cache';
+export { cacheKey, getOrFetch, memoryCache, readThrough, TTL } from './cache';
 export type { VoipCache } from './cache';
 export { decodeHtmlEntities, htmlToMarkdown, normalizeCategories, normalizeProduct, poRefOf } from './normalize';
 export type {

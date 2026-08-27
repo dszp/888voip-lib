@@ -5,10 +5,10 @@ import * as lib from './index';
 describe('public surface', () => {
   it('exports exactly what consumers are meant to reach', () => {
     expect(Object.keys(lib).sort()).toEqual([
-      'TTL', 'VoipApiError', 'VoipClient',
+      'TTL', 'VoipApiError', 'VoipClient', 'VoipShapeError',
       'cacheKey', 'createToken', 'decodeHtmlEntities', 'getOrFetch',
       'htmlToMarkdown', 'memoryCache', 'normalizeCategories', 'normalizeProduct',
-      'poRefOf', 'revokeAllTokens', 'revokeToken',
+      'poRefOf', 'readThrough', 'revokeAllTokens', 'revokeToken',
     ]);
   });
 
