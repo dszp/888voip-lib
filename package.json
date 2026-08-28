@@ -1,6 +1,6 @@
 {
   "name": "@dszp/888voip-lib",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Portable, Node-free 888VoIP Channel Advantage toolkit: a read-only API client, an injected cache interface, and the normalisations their API's quirks require. Runs unchanged in a Cloudflare Worker, Node, or the browser.",
   "type": "module",
   "license": "MIT",
@@ -54,7 +54,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
-    "test": "vitest run",
+    "//verify": "Build, then actually IMPORT the built entry point with Node. `pnpm build` and `vitest run` BOTH pass on a dist that cannot be loaded: tsc emits relative specifiers verbatim and vitest resolves extensionless ones, so 0.1.0 shipped to npm throwing ERR_MODULE_NOT_FOUND on first import. moduleResolution NodeNext now makes the compiler refuse the bad form; this is the backstop that checks the artefact a consumer actually gets, rather than the sources it was built from.",
+		"verify": "pnpm build && node --input-type=module -e \"import('./dist/index.js').then(m => { if (!Object.keys(m).length) { throw new Error('dist/index.js exported nothing'); } console.log('verify: dist imports cleanly,', Object.keys(m).length, 'exports'); })\"",
+		"test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {

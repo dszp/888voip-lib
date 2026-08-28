@@ -1,4 +1,4 @@
-import { VoipApiError } from './http';
+import { VoipApiError } from './http.js';
 
 /**
  * Minting and revoking 888VoIP bearer tokens.

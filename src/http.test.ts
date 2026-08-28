@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { request, VoipApiError } from './http';
+import { request, VoipApiError } from './http.js';
 
 afterEach(() => { vi.unstubAllGlobals(); });
 

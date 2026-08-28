@@ -1,6 +1,6 @@
 // src/index.test.ts
 import { describe, it, expect } from 'vitest';
-import * as lib from './index';
+import * as lib from './index.js';
 
 describe('public surface', () => {
   it('exports exactly what consumers are meant to reach', () => {

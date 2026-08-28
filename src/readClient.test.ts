@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { VoipClient, type VoipClientOptions } from './readClient';
-import { memoryCache } from './cache';
-import { fakeOrder, stubFetch } from './testkit';
+import { VoipClient, type VoipClientOptions } from './readClient.js';
+import { memoryCache } from './cache.js';
+import { fakeOrder, stubFetch } from './testkit.js';
 
 const BASE = 'https://api.example.com';
 // `VoipClientOptions['cache']`, not a `Parameters<typeof …prototype.constructor>` expression:

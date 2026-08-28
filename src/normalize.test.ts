@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { decodeHtmlEntities, htmlToMarkdown, normalizeCategories, normalizeProduct, poRefOf } from './normalize';
-import type { Product } from './model';
+import { decodeHtmlEntities, htmlToMarkdown, normalizeCategories, normalizeProduct, poRefOf } from './normalize.js';
+import type { Product } from './model.js';
 
 describe('decodeHtmlEntities', () => {
   it('decodes named, decimal and hex references', () => {

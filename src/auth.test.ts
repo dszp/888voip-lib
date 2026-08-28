@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createToken, revokeAllTokens, revokeToken } from './auth';
+import { createToken, revokeAllTokens, revokeToken } from './auth.js';
 
 afterEach(() => { vi.unstubAllGlobals(); });
 

@@ -6,7 +6,7 @@
  * forever. `ACME`, `example.com` and obviously-fake identifiers only.
  */
 import { vi } from 'vitest';
-import type { Order } from './model';
+import type { Order } from './model.js';
 
 /** Stub `fetch`, routing by `pathname + search`. An unrouted path answers 404. */
 export function stubFetch(routes: Record<string, { status?: number; body: unknown }>) {

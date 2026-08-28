@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.1 — 2026-08-28
+
+**0.1.0 could not be imported. Use this instead.**
+
+Every relative specifier in `src/` was extensionless — `from './readClient'` — which `tsc` emits
+verbatim, so `dist/index.js` asked Node for a file that does not exist and the published package
+threw `ERR_MODULE_NOT_FOUND` on first import. Nothing in the repo could see it: `moduleResolution:
+bundler` told the compiler to accept the form, and vitest resolves it too, so 79 tests and a clean
+build passed over a package no consumer could load.
+
+Fixed at the layer that can enforce it rather than only where it surfaced:
+
+- **`module`/`moduleResolution` are now `NodeNext`**, matching the three sibling libraries — which
+  is why they never had this bug. The compiler now refuses an extensionless relative import, so
+  the mistake cannot be reintroduced by hand.
+- **`pnpm verify` builds and then actually imports `dist/index.js` with Node**, and CI runs it
+  after the tests. Build and test both passing on an unimportable artefact is the whole lesson:
+  neither of them ever looked at what a consumer receives.
+
+No API change. Every export, signature and behaviour is identical to 0.1.0.
+
 ## 0.1.0 — 2026-08-27
 
 First public release. Lifted out of the read-only 888VoIP MCP server so a Cloudflare Worker can

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { cacheKey, getOrFetch, memoryCache, readThrough, TTL } from './cache';
+import { cacheKey, getOrFetch, memoryCache, readThrough, TTL } from './cache.js';
 
 describe('cacheKey', () => {
   it('is stable regardless of the order params were supplied in', () => {

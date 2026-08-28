@@ -44,3 +44,10 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # ⚠️ AFTER the tests, and it is not redundant with them. Build and test BOTH passed on the
+      # 0.1.0 that shipped to npm unimportable: tsc emitted extensionless relative specifiers
+      # verbatim and vitest resolved them anyway, so nothing in this file looked at the artefact
+      # a consumer actually receives. This imports it.
+      - name: Verify the built package imports
+        run: pnpm verify

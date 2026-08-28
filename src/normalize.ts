@@ -1,4 +1,4 @@
-import type { Order, Product } from './model';
+import type { Order, Product } from './model.js';
 
 /**
  * Decode HTML entities in 888VoIP's plain-text display strings. The API

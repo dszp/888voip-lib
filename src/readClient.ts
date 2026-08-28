@@ -1,7 +1,7 @@
-import { readThrough, cacheKey, TTL, type VoipCache } from './cache';
-import { request, VoipApiError, VoipShapeError } from './http';
-import { normalizeProduct } from './normalize';
-import type { Order, OrdersPage, PrivateWarehouse, Product, ProductFilters } from './model';
+import { readThrough, cacheKey, TTL, type VoipCache } from './cache.js';
+import { request, VoipApiError, VoipShapeError } from './http.js';
+import { normalizeProduct } from './normalize.js';
+import type { Order, OrdersPage, PrivateWarehouse, Product, ProductFilters } from './model.js';
 
 export interface VoipClientOptions {
   /** e.g. `https://api.888voip.com` (live) or `https://stagingapi.888voip.com` (test). */
