@@ -30,6 +30,11 @@ export interface VoipClientOptions {
    *
    * Not called when a read never reaches the cache — a not-found order is the case that matters,
    * because nulls are deliberately not cached.
+   *
+   * ⚠️ IT ALSO FIRES ON A CLIENT WITH NO CACHE AT ALL, always with `cached: false`. "Once per
+   * cache-backed read" above describes where it is called from, not a precondition. A consumer
+   * computing a hit rate over a cacheless client therefore sees 0%, not silence — which is the
+   * honest reading (nothing was served from cache) but only if you know to expect events.
    */
   onCacheRead?: (event: { key: string; cached: boolean }) => void;
 }
